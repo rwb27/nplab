@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>640</width>
+    <width>1108</width>
     <height>253</height>
    </rect>
   </property>
@@ -97,6 +97,27 @@
           </property>
           <property name="checked">
            <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="timeedit">
+          <property name="text">
+           <string>timer in s</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="specnumedit">
+          <property name="text">
+           <string>number of specs</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="timercheck">
+          <property name="text">
+           <string>Enable Timer</string>
           </property>
          </widget>
         </item>

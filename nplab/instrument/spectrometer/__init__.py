@@ -599,13 +599,41 @@ class SpectrometerDisplayUI(QtWidgets.QWidget,UiTools):
         self.period = 0.2
         self.filename_lineEdit.textChanged.connect(self.filename_changed_ui)
         register_for_property_changes(self.spectrometer,'filename',self.filename_changed)
+        
+        #Timer for measurement series
+        self.timer = QtCore.QTimer()
+        self.timer.stop()
+        self.timer.timeout.connect(self.timer_control) 
+        self.timerCounter = 0
+        
+        
+    def timer_control(self):
+        # Timer control
+        print self.timerCounter
+        if self.timerCounter > 0:
+            save_spectrum = self.spectrometer.save_spectra \
+                if isinstance(self.spectrometer, Spectrometers) \
+                else self.spectrometer.save_spectrum
+            save_spectrum(attrs={'description':str(self.description.text())})
+            self.timerCounter -= 1
+        else:
+            self.timer.stop()
+            self.timerCounter = 0
+            print 'Timer stopped'        
+        
+        
     def button_pressed(self, *args, **kwargs):
-        sender = self.sender()
+        sender = self.sender()          
         if sender is self.take_spectrum_button:
-            #if self._display_thread.is_alive():
+            #if self._display_thread.is_alive():            
+            if self.timercheck.isChecked() == True and self.timer.isActive() == 0:
+                self.timerCounter = int(self.specnumedit.text())
+                self.timer.start(int(self.timeedit.text())*1000)
+                print 'Starting timer'
             if self._display_thread.isRunning():
                 print 'already acquiring'
-                return
+                return 
+            
             #self._display_thread = Thread(target=self.update_spectrum)
             self._display_thread.single_shot = True
             self._display_thread.start()
@@ -723,6 +751,8 @@ class SpectrometersUI(QtWidgets.QWidget):
         layout.addWidget(controls_group)
         layout.addWidget(self.display)
         self.setLayout(layout)
+        
+ 
 
 
 class DummySpectrometer(Spectrometer):
@@ -756,16 +786,16 @@ if __name__ == '__main__':
     import sys
     from nplab.utils.gui import get_qt_app
     s1 = DummySpectrometer()
-    s1.show_gui(blocking = False)
-#    s2 = DummySpectrometer()
-#    s3 = DummySpectrometer()
-#    s4 = DummySpectrometer()
-#    spectrometers = Spectrometers([s1, s2,s3,s4])
-#    for spectrometer in spectrometers.spectrometers:
-#        spectrometer.integration_time = 100
-#    import timeit
-##    print '{0:.2f} ms'.format(1000*timeit.Timer(spectrometers.read_spectra).timeit(number=10)/10)
-##    app = get_qt_app()
-##    ui = SpectrometersUI(spectrometers)
-##    ui.show()
-#  #  sys.exit(app.exec_())
+    s1.show_gui(blocking = True)
+    #s2 = DummySpectrometer()
+    #s3 = DummySpectrometer()
+    #s4 = DummySpectrometer()
+    #spectrometers = Spectrometers([s1, s2,s3,s4])
+    #for spectrometer in spectrometers.spectrometers:
+    #    spectrometer.integration_time = 100
+    #import timeit
+    #print '{0:.2f} ms'.format(1000*timeit.Timer(spectrometers.read_spectra).timeit(number=10)/10)
+    #app = get_qt_app()
+    #ui = SpectrometersUI(spectrometers)
+    #ui.show()
+    #sys.exit(app.exec_())
