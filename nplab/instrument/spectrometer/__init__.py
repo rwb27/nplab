@@ -628,7 +628,7 @@ class SpectrometerDisplayUI(QtWidgets.QWidget,UiTools):
             #if self._display_thread.is_alive():            
             if self.timercheck.isChecked() == True and self.timer.isActive() == 0:
                 self.timerCounter = int(self.specnumedit.text())
-                self.timer.start(int(self.timeedit.text())*1000)
+                self.timer.start(float(self.timeedit.text())*1000)
                 print 'Starting timer'
             if self._display_thread.isRunning():
                 print 'already acquiring'
