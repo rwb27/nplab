@@ -20,6 +20,7 @@ import warnings
 import pyqtgraph as pg
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 from weakref import WeakSet
+from functools import partial
 
 from nplab.instrument import Instrument
 from nplab.utils.notified_property import NotifiedProperty, DumbNotifiedProperty, register_for_property_changes
@@ -480,10 +481,13 @@ class CameraParametersTableModel(QtCore.QAbstractTableModel):
     
     With thanks to http://stackoverflow.com/questions/11736560/edit-table-in-
     pyqt-using-qabstracttablemodel"""
-    def __init__(self, camera, parent=None):
+    def __init__(self, camera, parent=None, parameter_names=None):
         super(CameraParametersTableModel, self).__init__(parent)
         self.camera = camera
-        self.parameter_names = self.camera.camera_parameter_names()
+        if parameter_names is None:
+            self.parameter_names = self.camera.camera_parameter_names()
+        else:
+            self.parameter_names = parameter_names
         for parameter_name in self.parameter_names[:]:   #Added to prevent properties the camera does not posses from trying to appear in the list of parameters
             try:
                 getattr(self.camera, parameter_name)
@@ -552,10 +556,10 @@ class CameraParametersTableModel(QtCore.QAbstractTableModel):
     
 class CameraParametersWidget(QtWidgets.QWidget, UiTools):
     """An editable table that controls a camera's acquisition parameters."""
-    def __init__(self, camera, *args, **kwargs):
+    def __init__(self, camera, parameter_names=None, *args, **kwargs):
         super(CameraParametersWidget, self).__init__(*args, **kwargs)
         self.camera = camera
-        self.table_model = CameraParametersTableModel(camera)
+        self.table_model = CameraParametersTableModel(camera, parameter_names=parameter_names)
         self.table_view = QtWidgets.QTableView()
         self.table_view.setModel(self.table_model)
         self.table_view.setCornerButtonEnabled(False)
@@ -612,9 +616,43 @@ class CameraPreviewWidget(pg.GraphicsView):
             self.view_box.addItem(item)
         self._image_shape = ()
 
+        # Add a right-click submenu to allow us to adjust the range in the image view
+        # NB this is mostly useful for monochrome cameras
+        range_menu = self.view_box.menu.addMenu("Range")
+        for label, value in {"Auto":None, "0-1":(0, 1), "0-255":(0, 255)}.items():
+            action = range_menu.addAction(label)
+            action.triggered.connect(partial(self._set_range, value))
+
         # We want to make sure we always update the data in the GUI thread.
         # This is done using the signal/slot mechanism
         self.update_data_signal.connect(self.update_widget, type=QtCore.Qt.QueuedConnection)
+
+    # The next few properties deal with setting the range of the image viewer
+    _value_range = None
+    @property
+    def value_range(self):
+        """The range of values displayed in the image.  None means auto-range"""
+        return self._value_range
+    @value_range.setter
+    def value_range(self, new_range):
+        if new_range is None:
+            self._value_range = None
+        else:
+            try:
+                vmin, vmax = tuple(new_range)
+                self._value_range = (vmin, vmax)
+                self.image_item.setLevels((vmin, vmax))
+            except:
+                raise ValueError("Range should be None or a tuple of length 2")
+
+    @property
+    def autorange(self):
+        """Whether the image view autoranges"""
+        return self.value_range is None
+
+    def _set_range(self, value):
+        """Set the minimum and maximum values displayed"""
+        self.value_range = value
 
     def update_widget(self, newimage):
         """Set the image, but do so in the Qt main loop to avoid threading nasties."""
@@ -629,10 +667,11 @@ class CameraPreviewWidget(pg.GraphicsView):
         elif len(newimage.shape)==3:
             newimage = newimage.transpose((1,0,2))
         if newimage.dtype =="uint8":
-            self.image_item.setImage(newimage, autoLevels=False)
+            self.image_item.setImage(newimage, autoLevels=self.autorange)
         else:
-            self.image_item.setImage(newimage.astype(float))
+            self.image_item.setImage(newimage.astype(float), autoLevels=self.autorange)
         if newimage.shape != self._image_shape:
+            #TODO: find a sensible way to preserve custom crosshair positions!
             self._image_shape = newimage.shape
             self.set_crosshair_centre((newimage.shape[1]/2.0, newimage.shape[0]/2.0))
     def update_image(self, newimage):
