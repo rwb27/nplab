@@ -396,9 +396,9 @@ class Camera(Instrument):
         """Return a widget that contains the camera controls but no image."""
         return CameraControlWidget(self)
         
-    def get_parameters_widget(self):
+    def get_parameters_widget(self, parameter_names=None):
         """Return a widget that controls the camera's settings."""
-        return CameraParametersWidget(self)
+        return CameraParametersWidget(self, parameter_names=parameter_names)
         
     def get_qt_ui(self, control_only=False, parameters_only=False):
         """Create a QWidget that controls the camera.
@@ -480,10 +480,10 @@ class CameraParametersTableModel(QtCore.QAbstractTableModel):
     
     With thanks to http://stackoverflow.com/questions/11736560/edit-table-in-
     pyqt-using-qabstracttablemodel"""
-    def __init__(self, camera, parent=None):
+    def __init__(self, camera, parent=None, parameter_names = None):
         super(CameraParametersTableModel, self).__init__(parent)
         self.camera = camera
-        self.parameter_names = self.camera.camera_parameter_names()
+        self.parameter_names = self.camera.camera_parameter_names() if parameter_names is None else parameter_names
         for parameter_name in self.parameter_names[:]:   #Added to prevent properties the camera does not posses from trying to appear in the list of parameters
             try:
                 getattr(self.camera, parameter_name)
@@ -552,10 +552,10 @@ class CameraParametersTableModel(QtCore.QAbstractTableModel):
     
 class CameraParametersWidget(QtWidgets.QWidget, UiTools):
     """An editable table that controls a camera's acquisition parameters."""
-    def __init__(self, camera, *args, **kwargs):
+    def __init__(self, camera, *args, parameter_names=None, **kwargs):
         super(CameraParametersWidget, self).__init__(*args, **kwargs)
         self.camera = camera
-        self.table_model = CameraParametersTableModel(camera)
+        self.table_model = CameraParametersTableModel(camera, parameter_names=parameter_names)
         self.table_view = QtWidgets.QTableView()
         self.table_view.setModel(self.table_model)
         self.table_view.setCornerButtonEnabled(False)

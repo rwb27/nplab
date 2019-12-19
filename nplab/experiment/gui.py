@@ -84,11 +84,8 @@ class ExperimentWithProgressBar(Experiment):
     progress_maximum = None
     progress_minimum = 0
     def prepare_to_run(self, *args, **kwargs):
-        """Set up the experiment.  Must be overridden to set self.progress_maximum"""
-        if self.progress_maximum is not None:
-            return # If progress_maximum has been set elsewhere, that's ok...
-        raise NotImplementedError("Experiments with progress bars must set self.progress_maximum"
-                                  "in the prepare_to_run method.")
+        """Set up the experiment.  Should be overridden to set self.progress_maximum"""
+        pass
 
     def run_modally(self, *args, **kwargs):
         """Run the experiment in the background.
@@ -96,9 +93,9 @@ class ExperimentWithProgressBar(Experiment):
         This method replaces `Experiment.start()` and is blocking; it can safely be called
         from a Qt signal from a button.
         """
-     #   self.prepare_to_run(*args, **kwargs)
+        self.prepare_to_run(*args, **kwargs)
         if self.progress_maximum is None:
-            raise NotImplementedError("self.progress_maximum was not set - this is necessary.")
+            raise NotImplementedError("self.progress_maximum was not set - this is necessary.  You should override the prepare_to_run method.")
         self._progress_bar = QProgressDialogWithDeferredUpdate(
                                                    self.__class__.__name__,
                                                    "Abort",
@@ -109,7 +106,7 @@ class ExperimentWithProgressBar(Experiment):
         self._progress_bar.canceled.disconnect()
         self._progress_bar.canceled.connect(self.stop_and_cancel_dialog)
         self._experiment_thread = self.run_in_background(*args, **kwargs)
-   #     self._progress_bar.exec_()
+#        self._progress_bar.exec_()
 
     def stop_and_cancel_dialog(self):
         """Abort the experiment and cancel the dialog once done."""

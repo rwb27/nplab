@@ -209,6 +209,13 @@ class QuickControlBox(QtWidgets.QGroupBox, UiTools):
         self.controls[name] = le
         le.setObjectName(name + "_lineedit")
         self.layout().addRow(name.title(), le)
+
+    def add_plaintextedit(self, name):
+        """Add a multi-line text box control."""
+        te = QtWidgets.QPlainTextEdit()
+        self.controls[name] = te
+        te.setObjectName(name + "_plaintextedit")
+        self.layout().addRow(name.title(), te)
         
     def add_button(self, name, title=None):
         """Add a button."""
