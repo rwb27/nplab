@@ -615,7 +615,9 @@ class SpectrometerDisplayUI(QtWidgets.QWidget,UiTools):
 
         self.period = 0.2
         self.filename_lineEdit.textChanged.connect(self.filename_changed_ui)
-        register_for_property_changes(self.spectrometer,'filename',self.filename_changed)
+        if isinstance(self.spectrometer, Spectrometer):
+            register_for_property_changes(self.spectrometer,'filename',self.filename_changed)
+            
     def button_pressed(self, *args, **kwargs):
         sender = self.sender()
         if sender is self.take_spectrum_button:
