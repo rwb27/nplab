@@ -20,6 +20,7 @@ import warnings
 import pyqtgraph as pg
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 from weakref import WeakSet
+from functools import partial
 
 from nplab.instrument import Instrument
 from nplab.utils.notified_property import NotifiedProperty, DumbNotifiedProperty, register_for_property_changes
@@ -577,8 +578,10 @@ class PreviewViewBox(pg.ViewBox):
 class PreviewImageItem(pg.ImageItem):
     legacy_click_callback = None
     click_callback_signal = QtCore.Signal(np.ndarray)
+    last_mouse_click_event = None
     def mouseClickEvent(self, ev):
         """Handle a mouse click on the image."""
+        self.last_mouse_click_event = ev
         if ev.button() == QtCore.Qt.LeftButton:
             pos = np.array(ev.pos())
             if self.legacy_click_callback is not None:
@@ -612,10 +615,57 @@ class CameraPreviewWidget(pg.GraphicsView):
             self.view_box.addItem(item)
         self._image_shape = ()
 
+        # Add a right-click submenu to allow us to adjust the range in the image view
+        # NB this is mostly useful for monochrome cameras
+        range_menu = self.view_box.menu.addMenu("Range")
+        for label, value in {"Auto":"auto", "0-1":(0, 1), "0-255":(0, 255), "Match datatype":"dtype"}.items():
+            action = range_menu.addAction(label)
+            action.triggered.connect(partial(self._set_range, value))
+        
+        crosshair_menu = self.view_box.menu.addMenu("Crosshair")
+        action = crosshair_menu.addAction("Recentre here")
+        action.triggered.connect(self.recentre_crosshair_on_last_click)
+
         # We want to make sure we always update the data in the GUI thread.
         # This is done using the signal/slot mechanism
         self.update_data_signal.connect(self.update_widget, type=QtCore.Qt.QueuedConnection)
 
+    # The next few properties deal with setting the range of the image viewer
+    _value_range = "dtype"
+    @property
+    def value_range(self):
+        """The range of values displayed in the image.  None means auto-range"""
+        return self._value_range
+    @value_range.setter
+    def value_range(self, new_range):
+        if new_range in ["dtype", "auto"]:
+            self._value_range = new_range
+        else:
+            try:
+                vmin, vmax = tuple(new_range)
+                self._value_range = (vmin, vmax)
+                self.image_item.setLevels((vmin, vmax))
+            except:
+                raise ValueError("Range should be 'dtype', 'auto', or a tuple of length 2")
+            
+    def _set_range(self, value):
+        """Set the minimum and maximum values displayed"""
+        self.value_range = value
+
+    @property
+    def autorange(self):
+        """Whether the image view autoranges"""
+        return self.value_range == "auto"
+
+    def recentre_crosshair_on_last_click(self):
+        """Find the last click event triggered on the image, and recentre the crosshair there."""
+        ev = self.image_item.last_mouse_click_event
+        if ev is not None:
+            pos = np.array(ev.pos())
+            self.set_crosshair_centre(pos[::-1])
+
+
+    _last_image_dtype = None
     def update_widget(self, newimage):
         """Set the image, but do so in the Qt main loop to avoid threading nasties."""
         # I've explicitly dealt with the datatype of the source image, to avoid
@@ -628,10 +678,19 @@ class CameraPreviewWidget(pg.GraphicsView):
             newimage = newimage.transpose()
         elif len(newimage.shape)==3:
             newimage = newimage.transpose((1,0,2))
+        if newimage.dtype != self._last_image_dtype:
+            if self.value_range == "dtype":
+                if newimage.dtype == "uint8":
+                    self.image_item.setLevels((0, 255))
+                if newimage.dtype == "uint16":
+                    self.image_item.setLevels((0, 65535))
+                if newimage.dtype == "float":
+                    self.image_item.setLevels((0,1))
+
         if newimage.dtype =="uint8":
-            self.image_item.setImage(newimage, autoLevels=False)
+            self.image_item.setImage(newimage, autoLevels=self.autorange)
         else:
-            self.image_item.setImage(newimage.astype(float))
+            self.image_item.setImage(newimage.astype(float), autoLevels=self.autorange)
         if newimage.shape != self._image_shape:
             self._image_shape = newimage.shape
             self.set_crosshair_centre((newimage.shape[1]/2.0, newimage.shape[0]/2.0))
