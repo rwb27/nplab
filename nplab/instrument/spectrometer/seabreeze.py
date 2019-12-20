@@ -113,7 +113,7 @@ class OceanOpticsError(Exception):
         return "Code %d: %s." % (self.code, error_string(self.code))
 
 
-class OceanOpticsSpectrometer(Spectrometer, Instrument):
+class OceanOpticsSpectrometer(Spectrometer):
     """Class representing the Ocean Optics spectrometers, via the SeaBreeze library
 
     The constructor takes a single numeric argument, which is the index of the
